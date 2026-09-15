@@ -58,7 +58,7 @@ local validator that every draft has to pass):
 
 1. **Download** this repository:
    ```
-   git clone https://github.com/<your-username>/reply-guy.git
+   git clone https://github.com/n0krayy/reply-guy.git
    ```
    Or click **Code > Download ZIP** and extract it.
 

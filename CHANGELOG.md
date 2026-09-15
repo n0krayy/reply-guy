@@ -53,4 +53,4 @@ Initial release.
   registry, never from stored settings, so a stale value cannot redirect an API
   key to another host.
 
-[1.0.0]: https://github.com/<your-username>/reply-guy/releases/tag/v1.0.0
+[1.0.0]: https://github.com/n0krayy/reply-guy/releases/tag/v1.0.0
