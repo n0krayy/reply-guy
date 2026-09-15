@@ -123,6 +123,46 @@ header {
 .btn-primary:hover { background: var(--accent-blue-hover); }
 .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
 
+/* ─── Results jump-bar ───────────────────────────────────────────────────────
+   Sits directly under Generate. Its whole job is to make the outcome
+   unmissable: after a run the results section can be several screens down,
+   and hunting for it in the history panel is not discovery. */
+.results-jump {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; margin-top: 10px; padding: 10px 14px;
+  border: 1px solid var(--accent-blue); border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
+  color: var(--text-primary); font: inherit; font-size: 13px;
+  cursor: pointer; text-align: left;
+  transition: background 0.15s;
+  animation: results-pop 0.25s ease-out;
+}
+.results-jump:hover { background: color-mix(in srgb, var(--accent-blue) 22%, transparent); }
+.results-jump-text strong { font-size: 15px; color: var(--accent-blue); }
+.results-jump-cta {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: var(--accent-blue); font-weight: 700; white-space: nowrap;
+}
+@keyframes results-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .results-jump { animation: none; }
+}
+
+/* Brief highlight when results are revealed, so the eye can find them. */
+#sectionDrafts.results-flash {
+  animation: results-flash 1.2s ease-out;
+}
+@keyframes results-flash {
+  0%   { background: color-mix(in srgb, var(--accent-blue) 18%, transparent); }
+  100% { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #sectionDrafts.results-flash { animation: none; }
+}
+
 .btn-sm {
   padding: 6px 14px; font-size: 13px; font-weight: 600;
   border-radius: 9999px; cursor: pointer; transition: background 0.15s;

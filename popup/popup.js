@@ -115,6 +115,9 @@ const dom = {
   progressText: $('#progressText'),
   progressFill: $('#progressFill'),
   sectionDrafts: $('#sectionDrafts'),
+  btnResultsJump: $('#btnResultsJump'),
+  resultsJumpCount: $('#resultsJumpCount'),
+  resultsJumpLabel: $('#resultsJumpLabel'),
   statsDrafts: $('#statsDrafts'),
   statsTones: $('#statsTones'),
   statsQuality: $('#statsQuality'),
@@ -502,11 +505,22 @@ async function pollTargetTweet() {
 
   if (res.id !== lastResolvedId) {
     lastResolvedId = res.id;
-    // New target — clear the stale analysis.
-    currentTweet = null;
-    currentAnalysis = null;
-    renderTweetPlaceholder(res.meta, res.id, res.source);
-    updateGenerateState();
+
+    // Do NOT throw away work the user has already done. Switching tabs is
+    // routine, and wiping currentTweet here left a generated result set with
+    // no analysis above it and a disabled Generate button - the drafts looked
+    // like they had vanished. Keep the analysis and drafts; only swap the
+    // post preview so it reflects what is on screen now.
+    if (!currentTweet || !currentDrafts.length) {
+      currentTweet = null;
+      currentAnalysis = null;
+      renderTweetPlaceholder(res.meta, res.id, res.source);
+      updateGenerateState();
+    } else {
+      // Someone else's post is now on screen while results are still open.
+      // Leave the results alone and just note the change.
+      dom.tweetTarget.dataset.drifted = '1';
+    }
   }
 }
 
@@ -674,8 +688,19 @@ async function generate() {
     });
     if (!res.ok) throw new Error(res.error);
 
+    // Defensive: a response that is "ok" but carries no usable array would
+    // otherwise render an empty panel and toast a success, which reads as
+    // "it worked" while showing nothing. Fail loudly instead.
+    if (!Array.isArray(res.drafts) || !res.drafts.length) {
+      console.warn('[Reply Guy] generate returned ok but no drafts:', res);
+      throw new Error('The model returned no drafts. Try again, or switch model.');
+    }
+
     currentDrafts = res.drafts;
     renderDrafts();
+    // Bring the drafts into view automatically. The user pressed a button to get
+    // them, so they should not have to go looking.
+    revealResults();
     await refreshUsage();
 
     const pass = currentDrafts.filter(d => d.ok).length;
@@ -730,6 +755,38 @@ function renderDrafts() {
 
   dom.draftList.innerHTML = ordered.map(d => draftCardHtml(d)).join('');
   bindDraftActions();
+  updateResultsJump();
+}
+
+/**
+ * Keeps the jump-bar under Generate in sync with the drafts.
+ *
+ * Without this the results live only in the drafts section further down the
+ * panel, which is easy to miss and easy to mistake for "nothing happened".
+ */
+function updateResultsJump() {
+  if (!dom.btnResultsJump) return;
+  const n = currentDrafts.length;
+  if (!n) {
+    dom.btnResultsJump.classList.add('hidden');
+    return;
+  }
+  const clean = currentDrafts.filter(d => d.ok).length;
+  dom.resultsJumpCount.textContent = String(n);
+  dom.resultsJumpLabel.textContent = clean === n
+    ? (n === 1 ? 'reply ready' : 'replies ready')
+    : `${clean} clean \u00b7 ${n - clean} flagged`;
+  dom.btnResultsJump.classList.remove('hidden');
+}
+
+/** Scrolls the results into view and flashes them, so the eye can follow. */
+function revealResults() {
+  dom.sectionDrafts.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  dom.sectionDrafts.classList.remove('results-flash');
+  // Force a reflow so the animation restarts on repeated clicks.
+  void dom.sectionDrafts.offsetWidth;
+  dom.sectionDrafts.classList.add('results-flash');
+  setTimeout(() => dom.sectionDrafts.classList.remove('results-flash'), 1200);
 }
 
 function qualityBadges(d) {
@@ -950,7 +1007,11 @@ function wireEvents() {
   dom.btnClearDrafts.addEventListener('click', () => {
     currentDrafts = [];
     dom.sectionDrafts.classList.add('hidden');
+    updateResultsJump();
   });
+  if (dom.btnResultsJump) {
+    dom.btnResultsJump.addEventListener('click', revealResults);
+  }
   dom.btnCopyAll.addEventListener('click', async () => {
     const text = currentDrafts.map(d => `[${toneLabel(d.tone)}] ${d.text}`).join('\n\n');
     await navigator.clipboard.writeText(text);

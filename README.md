@@ -47,6 +47,9 @@ local validator that every draft has to pass):
 - **Auto Repair** - A draft that breaks a rule gets one rewrite pass, then is re-validated. A repair that makes things worse is rejected and the original kept
 - **Quality Badges** - Each draft shows its AI-smell score, slang found, and uniqueness at a glance
 - **Draft History** - Last 300 drafts, kept locally
+- **Results jump-bar** - After a run, a "N replies ready" bar appears right under
+  Generate and scrolls you to the drafts. You should never have to go looking for
+  the output you asked for.
 - **Side Panel Support** - Open as a sidebar alongside X.com
 - **Insert to Composer** - One click writes the draft into the reply box, without posting
 - **Light / Dark Theme** - Matches X.com's native look in either mode
@@ -202,6 +205,7 @@ reply-guy/
 │   ├── imports.test.mjs   # Module graph actually loads; enums agree across files
 │   ├── scrape.test.mjs    # DOM tweet scraping against fixtures
 │   ├── pipeline.test.mjs  # Full generate → validate → repair flow vs a mock model
+│   ├── ui.test.mjs        # Results visibility, tab-switch state, jump-bar
 │   └── live.test.mjs      # Same, against a real model (needs a key)
 ├── icons/
 │   ├── icon16.png
@@ -224,7 +228,6 @@ The extension reads your existing X.com session cookies (`ct0` CSRF token and
 create any new sessions.
 
 ### Reading the Post
-
 Reading a post off X is done in three steps, most reliable first:
 
 1. **Scrape it from the page.** X has already rendered the post into the DOM

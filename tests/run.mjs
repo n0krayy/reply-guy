@@ -15,6 +15,7 @@ const SUITES = [
   ['imports', 'imports.test.mjs'],
   ['scrape', 'scrape.test.mjs'],
   ['pipeline', 'pipeline.test.mjs'],
+  ['ui', 'ui.test.mjs'],
 ];
 
 let failed = 0;
