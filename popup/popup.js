@@ -11,7 +11,7 @@
  * validator, so the UI cannot disagree with the pipeline.
  */
 
-import { LANGUAGES, TONES, DEFAULTS } from '../lib/constants.js';
+import { LANGUAGES, TONES, DEFAULTS, REPLY_LENGTH } from '../lib/constants.js';
 import {
   PROVIDERS, PROVIDER_ORDER, PRESET_PROVIDERS, getProvider,
   validateProviderConfig,
@@ -821,6 +821,16 @@ function qualityBadges(d) {
   items.push(dotBadge(!q.slangMissing ? 'good' : 'warn', 'slang',
     q.slang.length ? q.slang.slice(0, 2).join(', ') : 'none found'));
 
+  // Length is a style rule, so it gets a badge rather than only a raw count.
+  // Drift is signed: a tight reply scores well, a rambling one does not.
+  const drift = q.lengthDrift ?? 0;
+  const lenState = drift > 55 ? 'bad' : drift > 30 ? 'warn' : 'good';
+  const lenNote = drift > 55 ? 'too long for a reply'
+    : drift > 30 ? 'longer than needed'
+    : drift < -60 ? 'very short'
+    : 'reply-length';
+  items.push(dotBadge(lenState, 'length', `${q.chars} chars, target ${REPLY_LENGTH.target}. ${lenNote}.`));
+
   if (q.repetition > 30) {
     items.push(dotBadge(q.repetition > 62 ? 'bad' : 'warn', 'unique', `${q.repetition}% overlap`));
   }
@@ -851,7 +861,10 @@ function draftCardHtml(d) {
     : `<span class="draft-badge bad">${d.blocking.length} issue${d.blocking.length > 1 ? 's' : ''}</span>`;
   const repairedBadge = d.repaired ? '<span class="draft-badge repaired">repaired</span>' : '';
   const editedBadge = d.edited ? '<span class="draft-badge repaired">edited</span>' : '';
-  const overLimit = q.chars > settings.maxChars;
+  // Compare against the policy ceiling, which the validator clamps to. A stale
+  // saved setting must not make an over-long draft look acceptable here.
+  const limit = Math.min(settings.maxChars, REPLY_LENGTH.max);
+  const overLimit = q.chars > limit;
   const id = escapeHtml(d._id);
 
   return `
@@ -869,7 +882,7 @@ function draftCardHtml(d) {
         <button class="btn-sm btn-insert" data-insert="${escapeHtml(d._id)}">Insert</button>
         <button class="btn-sm btn-outline" data-copy="${escapeHtml(d._id)}">Copy</button>
         <button class="btn-sm btn-outline" data-edit="${escapeHtml(d._id)}">Use as base</button>
-        <span class="draft-charcount ${overLimit ? 'over' : ''}">${q.chars}/${settings.maxChars}</span>
+        <span class="draft-charcount ${overLimit ? 'over' : ''}">${q.chars}/${limit}</span>
       </div>
     </div>`;
 }
@@ -973,7 +986,13 @@ async function saveSettings() {
     ...patch,
     language: dom.settingLanguage.value,
     temperature: parseFloat(dom.settingTemperature.value) || 0.95,
-    maxChars: parseInt(dom.settingMaxChars.value, 10) || 260,
+    // Clamp to the brevity policy. The validator clamps too, but storing an
+    // out-of-range value would make the settings screen disagree with the
+    // rules that actually run.
+    maxChars: Math.max(80, Math.min(
+      parseInt(dom.settingMaxChars.value, 10) || REPLY_LENGTH.max,
+      REPLY_LENGTH.max,
+    )),
     includeAuthorContext: dom.settingAuthorContext.checked,
     tones: selectedTones().length ? selectedTones() : ['friendly'],
     draftsPerTone: parseInt(dom.draftsPerTone.value, 10) || 3,

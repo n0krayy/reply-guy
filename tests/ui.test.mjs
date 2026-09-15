@@ -76,6 +76,20 @@ ok('drafts survive a target change',
   !/lastResolvedId = res\.id;[\s\S]{0,200}currentDrafts = \[\]/.test(js),
   'clearing drafts on tab switch would lose the replies');
 
+// ─── Length is visible in the UI ─────────────────────────────────────────────
+ok('draft cards show a length badge',
+  /dotBadge\(lenState, 'length'/.test(js), 'brevity is a rule, so it needs a badge');
+ok('the badge uses the signed drift to grade length',
+  /lengthDrift/.test(js) && /drift > 55/.test(js));
+ok('the character count is compared against the policy ceiling',
+  /Math\.min\(settings\.maxChars, REPLY_LENGTH\.max\)/.test(js),
+  'a stale saved setting must not make a long draft look acceptable');
+ok('the settings screen states the 180 ceiling',
+  /id="settingMaxChars"[^>]*max="180"/.test(html), 'the input still advertises 400');
+ok('saving clamps maxChars to the policy',
+  /Math\.max\(80, Math\.min\([\s\S]{0,120}REPLY_LENGTH\.max/.test(js),
+  'the settings screen must not disagree with the rules that run');
+
 // ─── A missing response must not look like success ───────────────────────────
 ok('an ok response with no drafts raises an error',
   /!Array\.isArray\(res\.drafts\) \|\| !res\.drafts\.length[\s\S]{0,160}throw/.test(js),

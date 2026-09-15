@@ -11,6 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const SUITES = [
   ['rules', 'rules.test.mjs'],
+  ['length', 'length.test.mjs'],
   ['manifest', 'manifest.test.mjs'],
   ['imports', 'imports.test.mjs'],
   ['scrape', 'scrape.test.mjs'],

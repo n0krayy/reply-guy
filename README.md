@@ -26,15 +26,54 @@ You click a post, hit **Analyze**, pick a language and a tone, and get a handful
 of drafts. Pick one, edit it if you want, insert it into the reply box. You press
 **Post** yourself - always.
 
-Three writing rules are baked in and enforced twice (in the prompt *and* by a
+Four writing rules are baked in and enforced twice (in the prompt *and* by a
 local validator that every draft has to pass):
 
 - **No emoji.** Not one.
+- **Keep it short.** A reply is a comment, not an essay. 120 characters is the target, 180 is the hard ceiling, and anything longer is rejected. Long output is the single loudest sign that a machine wrote it.
 - **Original sentence structure.** No AI tells, no "game-changer", no em dashes, no list-of-three rhythm.
 - **Slang required.** Each language has its own word bank the model is told to draw from.
 
 > **This is not a spam tool.** It writes drafts. You still choose what to post.
 > The extension has no code path that can post, reply, like, or follow for you.
+
+## 📏 Replies stay short
+
+Real people write short comments. Long ones are the giveaway.
+
+A reply under someone else's post is not a post of its own, and models default to
+writing essays. So brevity is a rule, not a suggestion:
+
+| | Target | Hard ceiling |
+|---|---|---|
+| Characters | **120** | **180** |
+| Words | **22** | **32** |
+
+Anything over the ceiling is **rejected** and sent back for a rewrite. The prompt
+also tells the model what to strip, because "be brief" on its own just produces
+the same length again:
+
+- Get to the point in the first few words. No preamble.
+- Don't explain your reasoning. A reaction or a jab, then stop.
+- Never summarise the post back to its author. They wrote it.
+- No closing line. Ending slightly abruptly is correct.
+- Over the limit? Delete a whole clause, don't trim word by word.
+
+Verbose drafts that stay under the ceiling still score worse on the AI-smell
+meter, so **Sort: Quality first** pushes the tight ones to the top.
+
+Two deliberate details:
+
+- **There is no minimum length.** `facts`, `fr this is it` and `setuju bgt` are
+  real replies. A floor would reject exactly the short, human output this tool
+  exists to produce.
+- **Chinese is weighted, not counted per character.** X counts CJK as 2 units.
+  Counting one word per hanzi made an ordinary 22-character reply register as
+  21 "words" and trip the word ceiling — so `countWords()` halves the hanzi count,
+  the same way X does.
+
+The ceiling is clamped in the validator, so an old saved `maxChars` of 260 cannot
+quietly disable the rule.
 
 ## ✨ Features
 
@@ -44,6 +83,7 @@ local validator that every draft has to pass):
 - **Bring Your Own AI Key** - Five providers (DeepSeek, Kimi, GLM, Gemini, ChatGPT) or any custom OpenAI-compatible endpoint
 - **Key Check Before Saving** - "Save & test" verifies your key with a 1-token request, so a bad key fails immediately instead of mid-reply
 - **Writing Rule Enforcement** - Every draft is scored for emoji, banned phrases, AI-smell, repetition and length
+- **Short By Design** - 120-character target, 180-character hard ceiling. Over-long replies are rejected and rewritten, because a wall of text is the clearest sign a machine wrote it
 - **Auto Repair** - A draft that breaks a rule gets one rewrite pass, then is re-validated. A repair that makes things worse is rejected and the original kept
 - **Quality Badges** - Each draft shows its AI-smell score, slang found, and uniqueness at a glance
 - **Draft History** - Last 300 drafts, kept locally
@@ -160,6 +200,7 @@ Each draft card shows what the validator found:
 | `edited` | You changed it manually |
 | `original` | AI-smell score. Lower is better. Under 30 is good |
 | `slang` | Slang markers detected in the draft |
+| `length` | Draft length vs. the target, graded as a reply |
 | `unique` | Overlap with other drafts. Only shows above 30% |
 
 Drafts that fail are **still shown**, with the reason. Nothing is hidden from you.
@@ -201,6 +242,7 @@ reply-guy/
 ├── tests/
 │   ├── run.mjs            # Test runner (npm test)
 │   ├── rules.test.mjs     # Writing rules and validators
+│   ├── length.test.mjs    # Brevity rule: target, ceiling, CJK weighting, prompt text
 │   ├── manifest.test.mjs  # Manifest validity, file refs, syntax, safety invariants
 │   ├── imports.test.mjs   # Module graph actually loads; enums agree across files
 │   ├── scrape.test.mjs    # DOM tweet scraping against fixtures
@@ -288,7 +330,7 @@ Open **Settings** (gear icon) to configure:
 | Model | `deepseek-chat` | Model name |
 | Default language | Bahasa Indonesia | Language pre-selected on open |
 | Temperature | 0.95 | Higher = more varied and less generically AI-sounding |
-| Max characters | 260 | Reply length cap |
+| Max characters | 180 | Reply length ceiling (target is 120). Values above 180 are clamped |
 | Drafts per tone | 3 | How many drafts each tone produces |
 | Author context | On | Fetch the author's recent posts for better replies (costs 1 extra X call) |
 
@@ -305,6 +347,7 @@ npm test
 | Suite | What it covers |
 |---|---|
 | `rules` | Emoji regex, banned phrases, AI-smell scoring, slang detection, validator verdicts |
+| `length` | Brevity rule: 120-char target, 180-char ceiling, word ceiling, CJK weighting, the prompt's brevity section, and that short human replies still pass |
 | `manifest` | Manifest validity, referenced files exist, syntax check on every JS file, popup DOM ids resolve, safety invariants |
 | `imports` | The module graph actually loads, and enums agree across files |
 | `pipeline` | Full generate → validate → repair → re-validate flow against a scripted mock model |

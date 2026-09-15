@@ -287,10 +287,14 @@
         <div class="setting-group">
           <label>Max characters</label>
           <div class="input-group">
-            <input type="number" id="settingMaxChars" min="80" max="400" value="260" class="input-num">
+            <input type="number" id="settingMaxChars" min="80" max="180" value="180" class="input-num">
             <span class="input-suffix">chars</span>
           </div>
         </div>
+            <p class="setting-hint">
+              Kept short on purpose. A reply is a comment under someone else's post,
+              and a long one reads as machine-written. Values above 180 are clamped.
+            </p>
 
         <div class="setting-group">
           <label class="toggle-setting">

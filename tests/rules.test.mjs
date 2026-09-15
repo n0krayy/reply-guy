@@ -268,7 +268,10 @@ const upZh = buildUserPrompt({
   analysis: aZh, language: 'zh-CN', tones: ['friendly'], draftsPerTone: 2, maxChars: 260,
 });
 ok('ZH prompt mentions simplified', upZh.includes('简体中文'));
-ok('ZH prompt halves char budget', upZh.includes('130 Chinese characters'));
+// The budget is derived from REPLY_LENGTH.max (180), halved for CJK weighting.
+ok('ZH prompt halves the char budget for CJK weighting',
+  upZh.includes('90 Chinese characters'),
+  'prompt no longer states a CJK-aware ceiling');
 
 // Every tone must have a complete spec.
 for (const [id, spec] of Object.entries(TONE_SPECS)) {
