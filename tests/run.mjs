@@ -13,6 +13,7 @@ const SUITES = [
   ['rules', 'rules.test.mjs'],
   ['manifest', 'manifest.test.mjs'],
   ['imports', 'imports.test.mjs'],
+  ['scrape', 'scrape.test.mjs'],
   ['pipeline', 'pipeline.test.mjs'],
 ];
 

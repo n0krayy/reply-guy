@@ -200,6 +200,7 @@ reply-guy/
 │   ├── rules.test.mjs     # Writing rules and validators
 │   ├── manifest.test.mjs  # Manifest validity, file refs, syntax, safety invariants
 │   ├── imports.test.mjs   # Module graph actually loads; enums agree across files
+│   ├── scrape.test.mjs    # DOM tweet scraping against fixtures
 │   ├── pipeline.test.mjs  # Full generate → validate → repair flow vs a mock model
 │   └── live.test.mjs      # Same, against a real model (needs a key)
 ├── icons/
@@ -222,16 +223,33 @@ The extension reads your existing X.com session cookies (`ct0` CSRF token and
 `twid` user ID) directly from the page - it does **NOT** ask for your password or
 create any new sessions.
 
+### Reading the Post
+
+Reading a post off X is done in three steps, most reliable first:
+
+1. **Scrape it from the page.** X has already rendered the post into the DOM
+   before the extension runs, so the content script can just read it. No network
+   request, no query ID, no rate limit.
+2. **GraphQL** (`TweetResultByRestId`) for posts that are not on screen.
+3. **REST v1.1** (`statuses/show.json`) as a last resort.
+
+The order is deliberate. GraphQL query IDs rotate, and X has retired much of the
+v1.1 REST surface - so a fetch-only design eventually returns 404 for everyone,
+no matter how correct the code is. The DOM path has no such dependency, which is
+why it goes first. If all three fail, the extension says so instead of surfacing
+a bare `404` that reads like a broken install.
+
+Media-only posts (no text body) are rejected with an explanation, since there is
+nothing for the model to analyze.
+
 ### API Calls
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /i/api/graphql/<qid>/TweetResultByRestId` | Fetch the post you're replying to |
-| `GET /1.1/statuses/show.json` | Fallback post fetch if GraphQL query IDs have rotated |
+| *(DOM scrape)* | Primary: read the post straight off the page |
+| `GET /i/api/graphql/<qid>/TweetResultByRestId` | Fetch a post that is not on screen |
+| `GET /1.1/statuses/show.json` | Last-resort post fetch |
 | `GET /1.1/statuses/user_timeline.json` | Optional: author's recent posts for context |
-
-GraphQL query IDs rotate. The background worker tries a list of known IDs and
-falls back to REST v1.1 when they all 404.
 
 ### The Repair Loop
 
@@ -355,6 +373,21 @@ Three things, in order of impact:
 1. **Edit them.** Change a few words to your own phrasing. This is the biggest factor.
 2. **Raise the temperature** in Settings to 1.0-1.1.
 3. **Try a different model.** Larger models follow the slang rule more naturally instead of dropping in a slang word mechanically. DeepSeek and ChatGPT are the strongest for English and Indonesian.
+
+</details>
+
+<details>
+<summary><strong>"Could not read this post" / "REST tweet fetch failed: 404".</strong></summary>
+
+Reply Guy reads posts in three ways and only reports failure when all three miss:
+scraping the rendered page, then GraphQL, then REST v1.1.
+
+Almost always this means the post is not currently rendered on any open x.com
+tab. The fix is simple: **open the post's own page** (click it so the URL ends in
+`/status/<id>`), make sure it is visible, and try again.
+
+If it still fails, the post may be deleted, protected, or withheld - or your X
+session has gone stale. Reload x.com and try once more.
 
 </details>
 

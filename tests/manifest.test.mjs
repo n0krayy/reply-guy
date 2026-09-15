@@ -182,6 +182,23 @@ ok('background requests host permission at runtime',
 ok('permission is requested only for the configured origin',
   /function originPattern/.test(popupJs) && /\$\{u\.protocol\}\/\/\$\{u\.host\}\/\*/.test(popupJs));
 
+// ─── Tweet reading must survive X's API churn ───────────────────────────────
+// GraphQL query ids get rotated and the v1.1 REST surface has largely been
+// retired, so a fetch-only path eventually 404s for everyone. The DOM scrape
+// has no such dependency and must stay the first thing tried.
+const contentJs = readFileSync(join(ROOT, 'content.js'), 'utf8');
+ok('content script can scrape a tweet off the page',
+  /function scrapeTweetFromDom/.test(contentJs) && /SCRAPE_TWEET/.test(contentJs),
+  'without this the extension depends entirely on rotating API ids');
+ok('background tries the DOM before any network fetch',
+  /scrapeTweetFromTab\(tweetId\)[\s\S]{0,400}fetchTweetGraphQL\(tweetId\)/.test(bgSource),
+  'the DOM read must come first');
+ok('a total read failure explains itself instead of surfacing a bare 404',
+  /all three methods failed/.test(bgSource),
+  '"404" reads like a broken extension rather than a moved upstream API');
+ok('media-only posts are rejected with a reason',
+  /media-only/.test(contentJs));
+
 // ─── The permission request must keep its user gesture ──────────────────────
 // chrome.permissions.request() only works while a click gesture is on the
 // stack. Any await before it (including a message round-trip to the service

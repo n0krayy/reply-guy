@@ -113,6 +113,94 @@
     return m ? m[1] : null;
   }
 
+  /**
+   * Reads a tweet straight out of the rendered page.
+   *
+   * This is the primary fetch path. X renders the whole tweet into the DOM
+   * before we ever run, so scraping it needs no API call, no query id, and
+   * cannot be broken by X rotating its GraphQL hashes or retiring the v1.1
+   * REST endpoints. It also cannot rate-limit, because it is not a request.
+   *
+   * The extension still keeps its network paths as a fallback for tweets that
+   * are not currently on screen.
+   *
+   * @returns {{text: string, author: object, hasMedia: boolean, id: string}|null}
+   */
+  function scrapeTweetFromDom(tweetId) {
+    const articles = [...document.querySelectorAll('article')];
+
+    // Prefer the article that actually contains this status id, so a reply
+    // further down the thread never gets mistaken for the target.
+    let article = null;
+    for (const a of articles) {
+      if (tweetIdFromArticle(a) === tweetId) { article = a; break; }
+    }
+    if (!article && tweetId) return null;
+    if (!article) {
+      article = document.querySelector('article[tabindex="-1"]') || articles[0] || null;
+    }
+    if (!article) return null;
+
+    // Tweet body. X marks it data-testid="tweetText"; the lang attribute and
+    // nested spans/dividers carry emoji and formatting we want to preserve.
+    const textEl = article.querySelector('[data-testid="tweetText"]');
+    let text = '';
+    if (textEl) {
+      text = textEl.innerText || textEl.textContent || '';
+    }
+    // Photo-only or video-only posts have no tweetText node. Returning them
+    // with an empty body would hand the model nothing to react to, so treat
+    // them as unscraped and let the caller explain.
+    const hasMedia = !!article.querySelector(
+      '[data-testid="tweetPhoto"], [data-testid="videoPlayer"], [data-testid="card.wrapper"]'
+    );
+    if (!text) return { text: '', hasMedia, id: tweetId, mediaOnly: hasMedia };
+
+    // Quoted tweet: X wraps it in a link container whose inner article holds
+    // the quoted body. The `t !== text` check is what stops a post from
+    // appearing to quote itself, because the post's own body also lives under
+    // a div[role="link"].
+    let quoted = null;
+    for (const sel of ['[data-testid="quoteTweet"]', 'div[role="link"]']) {
+      for (const cand of article.querySelectorAll(sel)) {
+        const q = cand.querySelector('[data-testid="tweetText"]');
+        if (!q) continue;
+        const t = ((q.innerText || q.textContent) || '').trim();
+        if (t && t !== text.trim()) { quoted = t; break; }
+      }
+      if (quoted) break;
+    }
+
+    const author = scrapeAuthorFromDom(article);
+
+    return {
+      id: tweetId || tweetIdFromArticle(article),
+      text: text.trim(),
+      hasMedia,
+      quoted,
+      author,
+    };
+  }
+
+  /** Pulls handle, display name and avatar out of an article's own header. */
+  function scrapeAuthorFromDom(article) {
+    const author = {};
+    try {
+      // The User-Name block sits above the tweet body and holds the handle.
+      const block = article.querySelector('[data-testid="User-Name"]');
+      const spans = block ? [...block.querySelectorAll('span')] : [];
+      for (const s of spans) {
+        const t = (s.textContent || '').trim();
+        if (!t) continue;
+        if (t.startsWith('@') && !author.handle) { author.handle = t; continue; }
+        if (!author.name) author.name = t;
+      }
+      const img = article.querySelector('[data-testid="Tweet-User-Avatar"] img');
+      if (img) author.avatar = img.getAttribute('src') || '';
+    } catch { /* non-fatal: author context is a nicety, not a requirement */ }
+    return author;
+  }
+
   /** Returns the id of the tweet the user is most likely looking at. */
   function resolveTargetTweetId() {
     // 1. An explicitly focused article (keyboard-navigated on the timeline).
@@ -339,6 +427,30 @@
       const target = resolveTargetTweetId();
       const meta = target.id ? scrapeTweetMeta() : null;
       sendResponse({ ok: !!target.id, ...target, meta });
+      return;
+    }
+
+    // Primary tweet fetch: read it off the page. No API call, no query id, so
+    // it keeps working when X rotates GraphQL hashes or retires v1.1 REST.
+    if (msg.type === 'SCRAPE_TWEET') {
+      let tweet = null;
+      try {
+        tweet = scrapeTweetFromDom(msg.tweetId);
+      } catch (err) {
+        sendResponse({ ok: false, error: err.message });
+        return;
+      }
+      if (!tweet) { sendResponse({ ok: false, error: 'not-on-page' }); return; }
+      // A post with media but no text has nothing for the model to analyze.
+      if (!tweet.text) {
+        sendResponse({
+          ok: false,
+          error: 'media-only',
+          message: 'That post is media with no text. Reply Guy needs text to analyze.',
+        });
+        return;
+      }
+      sendResponse({ ok: true, tweet });
       return;
     }
 

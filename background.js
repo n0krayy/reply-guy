@@ -307,6 +307,55 @@ async function fetchAuthorContext(authorId, excludeTweetId) {
     .map(t => (t.full_text || t.text || '').slice(0, 240));
 }
 
+/**
+ * Asks the content script to read the tweet off the rendered page.
+ * Returns null when the tweet is not currently on screen.
+ */
+async function scrapeTweetFromTab(tweetId) {
+  const tabs = await chrome.tabs.query({ url: ['https://x.com/*', 'https://twitter.com/*'] });
+  for (const tab of tabs) {
+    if (!tab.id) continue;
+    try {
+      const res = await chrome.tabs.sendMessage(tab.id, { type: 'SCRAPE_TWEET', tweetId });
+      if (res?.ok && res.tweet?.text) return normalizeScrapedTweet(res.tweet);
+    } catch { /* tab has no content script yet, try the next */ }
+  }
+  return null;
+}
+
+/**
+ * Gives a DOM-scraped tweet the same shape as a normalized API result, so
+ * downstream code never has to care which path produced it.
+ *
+ * Fields the DOM simply does not carry (like counts, exact timestamp) are left
+ * at neutral values rather than invented.
+ */
+function normalizeScrapedTweet(scraped) {
+  const a = scraped.author || {};
+  return {
+    id: scraped.id || null,
+    text: scraped.text || '',
+    created_at: null,
+    lang: null,
+    conversation_id: null,
+    reply_count: 0,
+    in_reply_to_status_id: null,
+    in_reply_to_screen_name: a.handle || null,
+    is_retweet: /^RT @/.test(scraped.text || ''),
+    quoted: scraped.quoted || null,
+    metrics: { likes: 0, retweets: 0, replies: 0, views: 0 },
+    hasMedia: !!scraped.hasMedia,
+    author: {
+      id: null,
+      handle: a.handle || '',
+      name: a.name || '',
+      avatar: a.avatar || '',
+      followers: 0,
+      recentTweets: [],
+    },
+  };
+}
+
 async function fetchTweet(tweetId, opts = {}) {
   // Cache first.
   const cached = await getStored('tweetCache', {});
@@ -314,15 +363,45 @@ async function fetchTweet(tweetId, opts = {}) {
   if (hit && Date.now() - hit.at < 30 * 60 * 1000) return hit.data;
 
   let tweet = null;
-  let source = 'graphql';
-  try {
-    tweet = await fetchTweetGraphQL(tweetId);
-  } catch (err) {
-    if (err instanceof AuthError) throw err;
-    console.warn('[Reply Guy] GraphQL failed, falling back to REST:', err.message);
-    tweet = await fetchTweetREST(tweetId);
-    source = 'rest';
+  let source = 'dom';
+
+  // 1. DOM scrape. Preferred: no request, no query id, no rate limit. The page
+  //    has already rendered the tweet, so it cannot go stale the way a
+  //    hard-coded GraphQL id does.
+  if (opts.allowDom !== false) {
+    try {
+      tweet = await scrapeTweetFromTab(tweetId);
+    } catch { /* fall through to the network paths */ }
   }
+
+  // 2. GraphQL (works only while its query ids are current).
+  if (!tweet) {
+    source = 'graphql';
+    try {
+      tweet = await fetchTweetGraphQL(tweetId);
+    } catch (err) {
+      if (err instanceof AuthError) throw err;
+      console.warn('[Reply Guy] GraphQL fetch failed:', err.message);
+    }
+  }
+
+  // 3. REST v1.1 (X has retired much of this surface, so it often 404s).
+  if (!tweet) {
+    source = 'rest';
+    try {
+      tweet = await fetchTweetREST(tweetId);
+    } catch (err) {
+      if (err instanceof AuthError) throw err;
+      console.warn('[Reply Guy] REST fetch failed:', err.message);
+      // Every path is gone. Say what was tried, because "404" alone reads like
+      // a broken extension rather than an upstream API that moved.
+      throw new Error(
+        'Could not read this post. Open the post on x.com (its own page), scroll it into view, then try again.'
+        + ' Behind the scenes all three methods failed: page scrape, GraphQL, and REST.'
+      );
+    }
+  }
+
   if (!tweet) throw new Error('Tweet not found');
 
   if (opts.withAuthorContext && tweet.author?.id) {
