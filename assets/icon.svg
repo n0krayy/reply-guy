@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Reply Guy icon: speech bubble + lightning bolt on X-black -->
+  <rect width="128" height="128" rx="28" fill="#000000"/>
+  <!-- Speech bubble -->
+  <path d="M64 26c-20.4 0-37 13.4-37 30 0 9.4 5.4 17.9 13.8 23.4l-3.6 18.9c-.4 1.9 1.7 3.4 3.4 2.3l19.6-12.6c1.2.1 2.5.2 3.8.2 20.4 0 37-13.4 37-30S84.4 26 64 26z" fill="#ffffff"/>
+  <!-- Lightning bolt -->
+  <path d="M67.5 42.5 51 70.5h11.5L58 89.5 76.5 60H64.5l3-17.5z" fill="#1d9bf0"/>
+</svg>

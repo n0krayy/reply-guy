@@ -1,0 +1,15 @@
+{
+  "name": "reply-guy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "X reply assistant Chrome extension — analyze, generate, insert",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/run.mjs",
+    "test:rules": "node tests/rules.test.mjs",
+    "test:manifest": "node tests/manifest.test.mjs",
+    "test:imports": "node tests/imports.test.mjs",
+    "test:pipeline": "node tests/pipeline.test.mjs",
+    "test:live": "node tests/live.test.mjs"
+  }
+}

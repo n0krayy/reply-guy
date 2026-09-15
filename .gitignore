@@ -1,0 +1,27 @@
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node (only used for the test suite)
+node_modules/
+package-lock.json
+
+# Packed extension
+*.crx
+*.pem
+*.zip
+
+# Local debug
+*.log
+
+# Never commit a key. The extension takes keys from the UI, not from here.
+.env
+.env.*
