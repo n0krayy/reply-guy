@@ -316,9 +316,22 @@ async function saveSetup() {
 
   dom.btnSetupSave.disabled = true;
   dom.btnSetupSave.textContent = 'Testing...';
-  setSetupStatus('Testing your key...', 'busy');
+
+  const target = getProvider(patch.provider).id === 'custom'
+    ? new URL(patch.baseUrl).host
+    : getProvider(patch.provider).label;
+  setSetupStatus(`Requesting access to ${target}...`, 'busy');
 
   try {
+    // Ask for the origin BEFORE testing. Chrome blocks the fetch otherwise and
+    // the failure surfaces as an opaque "Failed to fetch".
+    const perm = await send({ type: 'ENSURE_HOST_PERMISSION', settings: { ...settings, ...patch } });
+    if (!perm.ok) {
+      setSetupStatus(perm.error || 'Permission denied.', 'err');
+      return;
+    }
+
+    setSetupStatus(`Testing ${target}...`, 'busy');
     const res = await send({ type: 'TEST_PROVIDER', settings: { ...settings, ...patch } });
     if (!res.ok) {
       setSetupStatus(res.error || 'Connection failed.', 'err');
@@ -1027,6 +1040,10 @@ function wireEvents() {
     try {
       const pre = validateProviderConfig(candidate);
       if (!pre.ok) throw new Error(pre.error);
+
+      // Request the origin first; the fetch below is blocked without it.
+      const perm = await send({ type: 'ENSURE_HOST_PERMISSION', settings: { ...settings, ...candidate } });
+      if (!perm.ok) throw new Error(perm.error);
 
       const res = await send({ type: 'TEST_PROVIDER', settings: { ...settings, ...candidate } });
       if (!res.ok) throw new Error(res.error);

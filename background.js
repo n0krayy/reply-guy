@@ -37,6 +37,65 @@ function resolveLLMConfig(settings) {
   };
 }
 
+/**
+ * Strips a base URL down to an origin pattern Chrome understands as a host
+ * permission, e.g. "https://card.vantis.sh" -> "https://card.vantis.sh/*".
+ */
+function originPattern(baseUrl) {
+  let u;
+  try {
+    u = new URL(baseUrl);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+  // Match the whole origin, not just the path prefix.
+  return `${u.protocol}//${u.host}/*`;
+}
+
+/**
+ * Ensures the extension is allowed to talk to the given origin.
+ *
+ * The manifest declares broad https and http origins as OPTIONAL host
+ * permissions. Optional means exactly that: Chrome will block the request until
+ * the user grants it. Requesting it here, at the moment the user actually
+ * configures a custom endpoint, is what makes any URL work instead of only the
+ * handful that used to be hard-coded.
+ *
+ * Must be called from a user gesture (a popup button click), which is how the
+ * setup and settings screens invoke it.
+ *
+ * @returns {{ ok: boolean, error?: string, granted?: boolean }}
+ */
+async function ensureHostPermission(baseUrl) {
+  const pattern = originPattern(baseUrl);
+  if (!pattern) return { ok: false, error: 'That base URL is not a valid http(s) URL.' };
+
+  let already = false;
+  try {
+    already = await chrome.permissions.contains({ origins: [pattern] });
+  } catch {
+    return { ok: false, error: 'Could not check host permissions.' };
+  }
+  if (already) return { ok: true, granted: false };
+
+  let granted = false;
+  try {
+    granted = await chrome.permissions.request({ origins: [pattern] });
+  } catch (err) {
+    return { ok: false, error: `Permission request failed: ${err.message}` };
+  }
+
+  if (!granted) {
+    const host = new URL(baseUrl).host;
+    return {
+      ok: false,
+      error: `Access to ${host} was not granted. Reply Guy needs it to reach your endpoint. Press Save & test again and click Allow.`,
+    };
+  }
+  return { ok: true, granted: true };
+}
+
 // ─── State ───────────────────────────────────────────────────────────────────
 let authTokens = null;
 const KEEPALIVE_ALARM = 'reply-guy-keepalive';
@@ -586,8 +645,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'LIST_MODELS') {
     (async () => {
       try {
-        const models = await listModels(resolveLLMConfig(msg.settings), { timeoutMs: 15000 });
-        sendResponse({ ok: true, models });
+        const cfg = resolveLLMConfig(msg.settings);
+        // The user may be listing models before the origin is granted.
+        const perm = await ensureHostPermission(cfg.baseUrl);
+        if (!perm.ok) { sendResponse({ ok: false, error: perm.error }); return; }
+        const models = await listModels(cfg, { timeoutMs: 15000 });
+        sendResponse({ ok: true, models, permissionGranted: perm.granted });
       } catch (err) {
         sendResponse({ ok: false, error: err.message });
       }
@@ -595,11 +658,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
-  if (msg.type === 'LIST_MODELS') {
+  if (msg.type === 'ENSURE_HOST_PERMISSION') {
     (async () => {
       try {
-        const models = await listModels(msg.settings);
-        sendResponse({ ok: true, models });
+        const cfg = resolveLLMConfig(msg.settings);
+        const perm = await ensureHostPermission(cfg.baseUrl);
+        sendResponse(perm.ok ? { ok: true, granted: perm.granted } : { ok: false, error: perm.error });
       } catch (err) {
         sendResponse({ ok: false, error: err.message });
       }

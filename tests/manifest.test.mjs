@@ -150,23 +150,45 @@ ok('base URL is registry-owned for named providers',
   'background must not accept a user base URL for preset providers');
 
 // ─── Provider hosts must be reachable ───────────────────────────────────────
-// A provider whose host is missing from optional_host_permissions would fail
-// at fetch time with an opaque error. Catch that here instead.
+// The extension now requests host permission per-origin at runtime, so the
+// manifest must declare broad OPTIONAL access (never broad required access).
 const optionalHosts = manifest.optional_host_permissions || [];
+const requiredHosts = manifest.host_permissions || [];
+
+ok('optional host permissions cover any custom endpoint',
+  optionalHosts.includes('https://*/*') && optionalHosts.includes('http://*/*'),
+  optionalHosts.join(', '));
+ok('required host permissions stay limited to X',
+  requiredHosts.every(h => /^https:\/\/(x|twitter)\.com\/\*$/.test(h)),
+  requiredHosts.join(', '));
+ok('no wildcard host is REQUIRED (would prompt on install)',
+  !requiredHosts.some(h => /\/\*\/\*|^https:\/\/\*/.test(h)),
+  requiredHosts.join(', '));
+
 for (const [id, p] of Object.entries(PROVIDERS)) {
   if (id === 'custom' || !p.baseUrl) continue;
   const host = new URL(p.baseUrl).host;
   const covered = optionalHosts.some(pat => {
+    if (pat === 'https://*/*' || pat === 'http://*/*') return true;
     try { return new URL(pat.replace(/\*$/, '')).host === host; }
     catch { return false; }
   });
-  ok(`manifest allows outbound calls to ${id} (${host})`, covered,
-    `add https://${host}/* to optional_host_permissions`);
+  ok(`manifest can reach ${id} (${host})`, covered, optionalHosts.join(', '));
 }
-ok('manifest covers every provider host it needs', true);
-ok('manifest still grants no extra posting host',
-  !optionalHosts.some(h => /api\.m\.twitter|upload\.twitter/.test(h)),
-  optionalHosts.join(', '));
+
+ok('background requests host permission at runtime',
+  /chrome\.permissions\.request/.test(bgSource),
+  'without this, a custom endpoint is blocked with an opaque fetch error');
+ok('permission is requested only for the configured origin',
+  /function originPattern/.test(bgSource) && /\$\{u\.protocol\}\/\/\$\{u\.host\}\/\*/.test(bgSource));
+
+// ─── Fetch errors must not misdiagnose CORS as a dead server ────────────────
+const providersSource = readFileSync(join(ROOT, 'lib/providers.js'), 'utf8');
+ok('fetch failures mention CORS as a possible cause',
+  /CORS/.test(providersSource),
+  'a blocked origin and a dead server look identical to the browser');
+ok('fetch failures no longer assert the server is down',
+  !/and that the server is running/.test(providersSource.replace(/Nothing is listening[^`]*`/g, '')));
 ok('custom provider has its own key field in setup',
   popupHtml.includes('id="setupCustomApiKey"') && popupHtml.includes('id="settingCustomApiKey"'));
 

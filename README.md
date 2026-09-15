@@ -24,7 +24,7 @@ replies that don't sound like a bot wrote them.
 
 You click a post, hit **Analyze**, pick a language and a tone, and get a handful
 of drafts. Pick one, edit it if you want, insert it into the reply box. You press
-**Post** yourself — always.
+**Post** yourself - always.
 
 Three writing rules are baked in and enforced twice (in the prompt *and* by a
 local validator that every draft has to pass):
@@ -38,19 +38,19 @@ local validator that every draft has to pass):
 
 ## ✨ Features
 
-- **Tweet Analysis** — Pulls the post you're looking at via X's internal GraphQL API, plus an offline analyzer that reads intent, sentiment, topic and hooks
-- **3 Languages** — American English · Bahasa Indonesia · Mandarin (Simplified)
-- **5 Tones** — Friendly · Playful · Formal · Soft Selling · Edukatif
-- **Bring Your Own AI Key** — Five providers (DeepSeek, Kimi, GLM, Gemini, ChatGPT) or any custom OpenAI-compatible endpoint
-- **Key Check Before Saving** — "Save & test" verifies your key with a 1-token request, so a bad key fails immediately instead of mid-reply
-- **Writing Rule Enforcement** — Every draft is scored for emoji, banned phrases, AI-smell, repetition and length
-- **Auto Repair** — A draft that breaks a rule gets one rewrite pass, then is re-validated. A repair that makes things worse is rejected and the original kept
-- **Quality Badges** — Each draft shows its AI-smell score, slang found, and uniqueness at a glance
-- **Draft History** — Last 300 drafts, kept locally
-- **Side Panel Support** — Open as a sidebar alongside X.com
-- **Insert to Composer** — One click writes the draft into the reply box, without posting
-- **Light / Dark Theme** — Matches X.com's native look in either mode
-- **Rate Limit Protection** — Random delays and bounded exponential backoff on X API calls
+- **Tweet Analysis** - Pulls the post you're looking at via X's internal GraphQL API, plus an offline analyzer that reads intent, sentiment, topic and hooks
+- **3 Languages** - American English · Bahasa Indonesia · Mandarin (Simplified)
+- **5 Tones** - Friendly · Playful · Formal · Soft Selling · Edukatif
+- **Bring Your Own AI Key** - Five providers (DeepSeek, Kimi, GLM, Gemini, ChatGPT) or any custom OpenAI-compatible endpoint
+- **Key Check Before Saving** - "Save & test" verifies your key with a 1-token request, so a bad key fails immediately instead of mid-reply
+- **Writing Rule Enforcement** - Every draft is scored for emoji, banned phrases, AI-smell, repetition and length
+- **Auto Repair** - A draft that breaks a rule gets one rewrite pass, then is re-validated. A repair that makes things worse is rejected and the original kept
+- **Quality Badges** - Each draft shows its AI-smell score, slang found, and uniqueness at a glance
+- **Draft History** - Last 300 drafts, kept locally
+- **Side Panel Support** - Open as a sidebar alongside X.com
+- **Insert to Composer** - One click writes the draft into the reply box, without posting
+- **Light / Dark Theme** - Matches X.com's native look in either mode
+- **Rate Limit Protection** - Random delays and bounded exponential backoff on X API calls
 
 ## 📦 Installation
 
@@ -83,7 +83,7 @@ Reply Guy has **no built-in AI**. It runs on your own API key. The first time yo
 open it you'll see a setup screen and you can't generate anything until you
 connect a provider.
 
-### Option 1 — Paste a key (easiest)
+### Option 1 - Paste a key (easiest)
 
 Pick one of these five, paste the key, hit **Save & test**. The base URL and
 model list come from the extension, so there's nothing to type wrong.
@@ -96,13 +96,13 @@ model list come from the extension, so there's nothing to type wrong.
 | **Google Gemini** | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | `gemini-2.0-flash` | Generous free tier |
 | **ChatGPT (OpenAI)** | [platform.openai.com](https://platform.openai.com/api-keys) | `gpt-4o-mini` | Most consistent at obeying the no-emoji rule |
 
-### Option 2 — Custom OpenAI-compatible endpoint
+### Option 2 - Custom OpenAI-compatible endpoint
 
 Pick **Custom (OpenAI-compatible)** and fill in:
 
-- **Base URL** — anything exposing `/chat/completions`
-- **Model** — the model name your endpoint expects
-- **API key** — optional, leave blank for local servers
+- **Base URL** - anything exposing `/chat/completions`
+- **Model** - the model name your endpoint expects
+- **API key** - optional, leave blank for local servers
 
 Works with OpenRouter, Groq, Together, Ollama, llama.cpp, LM Studio, vLLM, and
 similar. There's a **Fetch** button that pulls the model list from `/models`
@@ -118,6 +118,16 @@ Common base URLs:
 | Ollama (local) | `http://localhost:11434/v1` |
 | LM Studio (local) | `http://localhost:1234/v1` |
 
+Any `http(s)` URL works. On the first **Save & test**, Chrome asks you to allow
+access to that specific host — click **Allow**. Reply Guy requests permission for
+the exact origin you typed, at the moment you type it, and nothing else.
+
+> **If you get a "Could not reach … CORS" message**, the endpoint refuses
+> browser requests. That is a limitation of the endpoint, not the extension: a
+> server that does not send `Access-Control-Allow-Origin` cannot be called from a
+> browser extension, and only the vendor can change that. DeepSeek, OpenAI, Groq
+> and OpenRouter all allow it. Some smaller or self-hosted gateways do not.
+ 
 > **Note:** If you switch providers later, the key field is cleared on purpose.
 > Each vendor needs its own key.
 
@@ -126,12 +136,12 @@ Common base URLs:
 ### Basic Workflow
 
 1. **Open x.com** and make sure you're logged in
-2. Click the extension icon — it should show **Connected** with your user ID
+2. Click the extension icon - it should show **Connected** with your user ID
 3. Scroll to the post you want to reply to and **click it** to open its detail view
-4. Click **Analyze** — the post text and analysis appear
+4. Click **Analyze** - the post text and analysis appear
 5. Pick a **language** (English / Indonesia / Mandarin)
 6. Pick one or more **tones** (Friendly / Playful / Formal / Soft Selling / Edukatif)
-7. Click **Generate** — drafts appear with quality badges
+7. Click **Generate** - drafts appear with quality badges
 8. Review them, edit if you want, then click **Insert** to drop one into the reply box
 9. **Read it once more, then press Post yourself**
 
@@ -142,7 +152,7 @@ Each draft card shows what the validator found:
 | Badge | Meaning |
 |---|---|
 | `clean` | Passed every rule |
-| `1 issue` / `2 issues` | Blocked by something — hover the card to see what |
+| `1 issue` / `2 issues` | Blocked by something - hover the card to see what |
 | `repaired` | Failed at first, was rewritten, now passes |
 | `edited` | You changed it manually |
 | `original` | AI-smell score. Lower is better. Under 30 is good |
@@ -159,7 +169,7 @@ Drafts that fail are **still shown**, with the reason. Nothing is hidden from yo
 - **Indonesian tone reads best** with DeepSeek or ChatGPT; **Mandarin reads best** with Kimi or GLM
 - **Bump the temperature** to 1.0-1.1 in Settings if replies feel samey
 - **Lower it** to 0.8 if they get too wild or off-topic
-- **Open the side panel** instead of the popup — it's a much better experience on a wide screen
+- **Open the side panel** instead of the popup - it's a much better experience on a wide screen
 
 ### Side Panel Mode
 
@@ -171,8 +181,8 @@ gives you more room for the post and the drafts at the same time.
 ```
 reply-guy/
 ├── manifest.json          # Chrome Extension Manifest V3
-├── background.js          # Service worker — tweet fetch, LLM calls, repair loop, cache
-├── content.js             # Content script — extracts auth tokens, bridges to the composer
+├── background.js          # Service worker - tweet fetch, LLM calls, repair loop, cache
+├── content.js             # Content script - extracts auth tokens, bridges to the composer
 ├── popup/
 │   ├── popup.html         # Main UI + setup screen + settings modal
 │   ├── popup.js           # UI logic, state management, draft rendering
@@ -209,7 +219,7 @@ reply-guy/
 ### Authentication
 
 The extension reads your existing X.com session cookies (`ct0` CSRF token and
-`twid` user ID) directly from the page — it does **NOT** ask for your password or
+`twid` user ID) directly from the page - it does **NOT** ask for your password or
 create any new sessions.
 
 ### API Calls
@@ -225,7 +235,7 @@ falls back to REST v1.1 when they all 404.
 
 ### The Repair Loop
 
-If a draft breaks a rule, it isn't just flagged — it's sent back to the model once
+If a draft breaks a rule, it isn't just flagged - it's sent back to the model once
 with a precise list of what it violated. Two details matter:
 
 - **Repairs run one at a time and know about their siblings.** Each repair is told
@@ -300,7 +310,7 @@ press Post.
 <summary><strong>Do I need my own API key?</strong></summary>
 
 Yes. Reply Guy ships with no AI built in. You connect your own provider key in
-the setup screen. Most providers have a free tier — Gemini and GLM's flash models
+the setup screen. Most providers have a free tier - Gemini and GLM's flash models
 are the easiest to start with for free.
 
 </details>
@@ -308,7 +318,7 @@ are the easiest to start with for free.
 <details>
 <summary><strong>Is my API key safe?</strong></summary>
 
-The key is stored in `chrome.storage.local`, which is unencrypted — that's the
+The key is stored in `chrome.storage.local`, which is unencrypted - that's the
 normal ceiling for an unpacked extension. It is only ever sent to the provider
 you picked. For the five named providers the base URL comes from the extension's
 compiled-in list, never from a saved setting, so a stale value can't redirect
@@ -349,6 +359,26 @@ Three things, in order of impact:
 </details>
 
 <details>
+<summary><strong>My custom endpoint says "Could not reach …" but the URL works in the browser.</strong></summary>
+
+Two things to check, in order.
+
+**1. Did you allow the host permission?** On the first **Save & test** Chrome
+shows a permission prompt naming your host. If you dismissed it, or if you added
+the URL after the prompt had already been shown, press **Save & test** again and
+click **Allow**. Without it Chrome blocks the request before it leaves the
+browser.
+
+**2. Does the endpoint allow browser requests?** A server only has to send
+`Access-Control-Allow-Origin` for extensions to reach it. Testing the URL in an
+address bar does not tell you anything — a normal page navigation is not subject
+to the same rule. To check, look at the response of an `OPTIONS` request to your
+endpoint; if the `access-control-allow-origin` header is missing or empty, the
+vendor has to fix it. Nothing on the extension side can work around that.
+
+</details>
+
+<details>
 <summary><strong>Can I use this with a local model?</strong></summary>
 
 Yes. Pick **Custom**, set the base URL to your local server
@@ -383,7 +413,7 @@ three miss, open an issue with the post you were on.
 >
 > Using AI to mass-produce replies is a good way to get muted, reported, or
 > suspended. This extension is built to help you write a better reply to a post
-> you actually care about — not to flood timelines. Use it that way.
+> you actually care about - not to flood timelines. Use it that way.
 
 ## 🤝 Contributing
 
@@ -398,13 +428,13 @@ Contributions are welcome! Please:
 
 ## 📄 License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE)
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE)
 file for details.
 
 ## 🙏 Credits
 
 Architecture inspired by [X Unfollower](https://github.com/kysoog/x-unfollowers)
-by [@KysooG](https://x.com/KysooG) — the MV3 side-panel layout, X session token
+by [@KysooG](https://x.com/KysooG) - the MV3 side-panel layout, X session token
 reuse, and storage conventions all come from there.
 
 ---

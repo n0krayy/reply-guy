@@ -500,7 +500,8 @@ console.log('=== Connection test classifies errors correctly ===');
     await testConnection({ provider: 'custom', baseUrl: 'https://nope.invalid/v1', model: 'm', apiKey: '' });
   } catch (e) { err = e; }
   ok('network failure names the host', /nope\.invalid/.test(err?.message || ''), err?.message);
-  ok('network failure includes the cause', /ENOTFOUND/.test(err?.message || ''), err?.message);
+  ok('network failure explains the cause',
+    /does not resolve/.test(err?.message || ''), err?.message);
 
   // Config problems are caught before any request is attempted.
   let dialed = false;
@@ -529,6 +530,49 @@ console.log('=== Connection test classifies errors correctly ===');
   const good = await testConnection({ provider: 'gemini', baseUrl: PROVIDERS.gemini.baseUrl, model: 'gemini-2.0-flash', apiKey: 'AIza-x' });
   ok('success reports the model', good.model === 'gemini-2.0-flash', JSON.stringify(good));
   ok('success returns ok true', good.ok === true);
+
+  restoreFetch();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('=== Transport failures are described, not guessed ===');
+{
+  // The exact failure that produced the misleading "server is running" message.
+  globalThis.fetch = async () => { throw new TypeError('Failed to fetch'); };
+  let err = null;
+  try {
+    await testConnection({ provider: 'custom', baseUrl: 'https://card.vantis.sh/v1', model: 'm', apiKey: '' });
+  } catch (e) { err = e; }
+
+  const msg = err?.message || '';
+  ok('names the host', /card\.vantis\.sh/.test(msg), msg);
+  ok('mentions CORS as a possible cause', /CORS/i.test(msg), msg);
+  ok('does NOT claim the server is down', !/server is running/i.test(msg), msg);
+
+  // A real DNS failure still gets the precise message.
+  globalThis.fetch = async () => { const e = new TypeError('fetch failed'); e.cause = { code: 'ENOTFOUND' }; throw e; };
+  err = null;
+  try {
+    await testConnection({ provider: 'custom', baseUrl: 'https://nope.invalid/v1', model: 'm', apiKey: '' });
+  } catch (e) { err = e; }
+  ok('ENOTFOUND is reported as a resolution failure', /does not resolve/.test(err?.message || ''), err?.message);
+
+  globalThis.fetch = async () => { const e = new TypeError('fetch failed'); e.cause = { code: 'ECONNREFUSED' }; throw e; };
+  err = null;
+  try {
+    await testConnection({ provider: 'custom', baseUrl: 'http://localhost:9/v1', model: 'm', apiKey: '' });
+  } catch (e) { err = e; }
+  ok('ECONNREFUSED says nothing is listening', /Nothing is listening/.test(err?.message || ''), err?.message);
+
+  // Timeout is its own message, not a reachability one.
+  globalThis.fetch = (url, opts) => new Promise((_, rej) => {
+    opts.signal?.addEventListener('abort', () => { const e = new Error('aborted'); e.name = 'AbortError'; rej(e); });
+  });
+  err = null;
+  try {
+    await testConnection({ provider: 'custom', baseUrl: 'https://slow.example/v1', model: 'm', apiKey: '' }, { timeoutMs: 250 });
+  } catch (e) { err = e; }
+  ok('timeout is reported as a timeout', /Timed out/.test(err?.message || ''), err?.message);
 
   restoreFetch();
 }
