@@ -120,7 +120,7 @@ Common base URLs:
 
 Any `http(s)` URL works. On the first **Save & test**, Chrome asks you to allow
 access to that specific host — click **Allow**. Reply Guy requests permission for
-the exact origin you typed, at the moment you type it, and nothing else.
+the exact origin you typed, at the moment you click, and nothing else.
 
 > **If you get a "Could not reach … CORS" message**, the endpoint refuses
 > browser requests. That is a limitation of the endpoint, not the extension: a
@@ -364,10 +364,10 @@ Three things, in order of impact:
 Two things to check, in order.
 
 **1. Did you allow the host permission?** On the first **Save & test** Chrome
-shows a permission prompt naming your host. If you dismissed it, or if you added
-the URL after the prompt had already been shown, press **Save & test** again and
-click **Allow**. Without it Chrome blocks the request before it leaves the
-browser.
+shows a permission prompt naming your host. Click **Allow**. If you dismissed it,
+press **Save & test** again on the same screen — a permission request is only
+valid during the click that triggered it, so it cannot be raised later or in the
+background.
 
 **2. Does the endpoint allow browser requests?** A server only has to send
 `Access-Control-Allow-Origin` for extensions to reach it. Testing the URL in an

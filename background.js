@@ -40,6 +40,11 @@ function resolveLLMConfig(settings) {
 /**
  * Strips a base URL down to an origin pattern Chrome understands as a host
  * permission, e.g. "https://card.vantis.sh" -> "https://card.vantis.sh/*".
+ *
+ * Host permission is REQUESTED from the popup (see popup/popup.js
+ * requestHostAccess), because chrome.permissions.request() needs a live user
+ * gesture and a message round-trip to this worker would consume it. The worker
+ * only reads the current state to produce a clear error when access is missing.
  */
 function originPattern(baseUrl) {
   let u;
@@ -49,51 +54,25 @@ function originPattern(baseUrl) {
     return null;
   }
   if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
-  // Match the whole origin, not just the path prefix.
   return `${u.protocol}//${u.host}/*`;
 }
 
 /**
- * Ensures the extension is allowed to talk to the given origin.
- *
- * The manifest declares broad https and http origins as OPTIONAL host
- * permissions. Optional means exactly that: Chrome will block the request until
- * the user grants it. Requesting it here, at the moment the user actually
- * configures a custom endpoint, is what makes any URL work instead of only the
- * handful that used to be hard-coded.
- *
- * Must be called from a user gesture (a popup button click), which is how the
- * setup and settings screens invoke it.
- *
- * @returns {{ ok: boolean, error?: string, granted?: boolean }}
+ * Reports whether the extension may reach the given origin, without prompting.
+ * Used to fail fast with a useful message instead of an opaque fetch error.
  */
-async function ensureHostPermission(baseUrl) {
+async function checkHostPermission(baseUrl) {
   const pattern = originPattern(baseUrl);
   if (!pattern) return { ok: false, error: 'That base URL is not a valid http(s) URL.' };
-
-  let already = false;
   try {
-    already = await chrome.permissions.contains({ origins: [pattern] });
-  } catch {
-    return { ok: false, error: 'Could not check host permissions.' };
-  }
-  if (already) return { ok: true, granted: false };
-
-  let granted = false;
-  try {
-    granted = await chrome.permissions.request({ origins: [pattern] });
-  } catch (err) {
-    return { ok: false, error: `Permission request failed: ${err.message}` };
-  }
-
-  if (!granted) {
-    const host = new URL(baseUrl).host;
-    return {
-      ok: false,
-      error: `Access to ${host} was not granted. Reply Guy needs it to reach your endpoint. Press Save & test again and click Allow.`,
-    };
-  }
-  return { ok: true, granted: true };
+    if (await chrome.permissions.contains({ origins: [pattern] })) return { ok: true };
+  } catch { /* treated as not held */ }
+  let host = baseUrl;
+  try { host = new URL(baseUrl).host; } catch { /* keep raw */ }
+  return {
+    ok: false,
+    error: `Reply Guy does not have access to ${host} yet. Open the panel and press Save & test to grant it.`,
+  };
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -646,11 +625,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     (async () => {
       try {
         const cfg = resolveLLMConfig(msg.settings);
-        // The user may be listing models before the origin is granted.
-        const perm = await ensureHostPermission(cfg.baseUrl);
+        // Read-only check. The popup already requested access on the click.
+        const perm = await checkHostPermission(cfg.baseUrl);
         if (!perm.ok) { sendResponse({ ok: false, error: perm.error }); return; }
         const models = await listModels(cfg, { timeoutMs: 15000 });
-        sendResponse({ ok: true, models, permissionGranted: perm.granted });
+        sendResponse({ ok: true, models });
       } catch (err) {
         sendResponse({ ok: false, error: err.message });
       }
@@ -658,12 +637,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
-  if (msg.type === 'ENSURE_HOST_PERMISSION') {
+  // Reports whether access exists. Deliberately does NOT request it: a
+  // permission prompt raised from the worker has no user gesture behind it and
+  // Chrome rejects it. The popup requests, this reports.
+  if (msg.type === 'CHECK_HOST_PERMISSION') {
     (async () => {
       try {
         const cfg = resolveLLMConfig(msg.settings);
-        const perm = await ensureHostPermission(cfg.baseUrl);
-        sendResponse(perm.ok ? { ok: true, granted: perm.granted } : { ok: false, error: perm.error });
+        const perm = await checkHostPermission(cfg.baseUrl);
+        sendResponse(perm.ok ? { ok: true } : { ok: false, error: perm.error });
       } catch (err) {
         sendResponse({ ok: false, error: err.message });
       }

@@ -18,6 +18,66 @@ import {
 } from '../lib/providers.js';
 import { validateDraftSet, validateDraft } from '../lib/rules.js';
 
+/**
+ * Strips a base URL down to an origin pattern Chrome understands as a host
+ * permission, e.g. "https://card.vantis.sh" -> "https://card.vantis.sh/*".
+ */
+function originPattern(baseUrl) {
+  let u;
+  try {
+    u = new URL(baseUrl);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+  return `${u.protocol}//${u.host}/*`;
+}
+
+/**
+ * Requests host access for the configured endpoint, from the popup.
+ *
+ * This runs in the popup page — NOT in the service worker — because
+ * `chrome.permissions.request()` requires a live user gesture, and a popup
+ * click is one. Routing it through a message to the background worker would
+ * consume the gesture during the round-trip and fail with "This function must
+ * be called during a user gesture".
+ *
+ * Named providers get permission requested too: their origin is knowable and
+ * asking here keeps a single code path for both cases.
+ *
+ * @returns {Promise<{ok: boolean, error?: string}>}
+ */
+async function requestHostAccess(candidate) {
+  const p = getProvider(candidate.provider);
+  const baseUrl = p.id === 'custom' ? candidate.baseUrl : p.baseUrl;
+
+  const pattern = originPattern(baseUrl);
+  if (!pattern) return { ok: false, error: 'That base URL is not a valid http(s) URL.' };
+
+  let host = baseUrl;
+  try { host = new URL(baseUrl).host; } catch { /* keep raw */ }
+
+  // No await before request(): the click gesture must still be on the stack.
+  let granted;
+  try {
+    granted = await chrome.permissions.request({ origins: [pattern] });
+  } catch (err) {
+    if (/user gesture/i.test(err.message || '')) {
+      return { ok: false, error: 'Chrome needs a fresh click for this. Close and reopen the panel, then press Save & test once.' };
+    }
+    return { ok: false, error: `Permission request failed: ${err.message}` };
+  }
+
+  if (granted) return { ok: true };
+
+  // false can mean "already held, no prompt needed" — verify before crying denial.
+  try {
+    if (await chrome.permissions.contains({ origins: [pattern] })) return { ok: true };
+  } catch { /* fall through to denial */ }
+
+  return { ok: false, error: `Access to ${host} was not granted. Press Save & test again and click Allow.` };
+}
+
 // ─── State ───────────────────────────────────────────────────────────────────
 let settings = { ...DEFAULTS };
 let authTokens = null;
@@ -323,9 +383,10 @@ async function saveSetup() {
   setSetupStatus(`Requesting access to ${target}...`, 'busy');
 
   try {
-    // Ask for the origin BEFORE testing. Chrome blocks the fetch otherwise and
-    // the failure surfaces as an opaque "Failed to fetch".
-    const perm = await send({ type: 'ENSURE_HOST_PERMISSION', settings: { ...settings, ...patch } });
+    // Requested here, in the click handler, so Chrome sees a live user gesture.
+    // Doing this via a message to the background worker fails with "must be
+    // called during a user gesture" because the round-trip consumes it.
+    const perm = await requestHostAccess(patch);
     if (!perm.ok) {
       setSetupStatus(perm.error || 'Permission denied.', 'err');
       return;
@@ -1041,8 +1102,8 @@ function wireEvents() {
       const pre = validateProviderConfig(candidate);
       if (!pre.ok) throw new Error(pre.error);
 
-      // Request the origin first; the fetch below is blocked without it.
-      const perm = await send({ type: 'ENSURE_HOST_PERMISSION', settings: { ...settings, ...candidate } });
+      // Must happen here, inside the click handler, for the user gesture.
+      const perm = await requestHostAccess(candidate);
       if (!perm.ok) throw new Error(perm.error);
 
       const res = await send({ type: 'TEST_PROVIDER', settings: { ...settings, ...candidate } });

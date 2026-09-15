@@ -177,10 +177,70 @@ for (const [id, p] of Object.entries(PROVIDERS)) {
 }
 
 ok('background requests host permission at runtime',
-  /chrome\.permissions\.request/.test(bgSource),
+  /chrome\.permissions\.request/.test(popupJs),
   'without this, a custom endpoint is blocked with an opaque fetch error');
 ok('permission is requested only for the configured origin',
-  /function originPattern/.test(bgSource) && /\$\{u\.protocol\}\/\/\$\{u\.host\}\/\*/.test(bgSource));
+  /function originPattern/.test(popupJs) && /\$\{u\.protocol\}\/\/\$\{u\.host\}\/\*/.test(popupJs));
+
+// ─── The permission request must keep its user gesture ──────────────────────
+// chrome.permissions.request() only works while a click gesture is on the
+// stack. Any await before it (including a message round-trip to the service
+// worker) consumes the gesture and fails with "This function must be called
+// during a user gesture". These assertions pin the two things that broke.
+/**
+ * Blanks out comments so a scan only sees real code.
+ *
+ * String literals are deliberately KEPT: the message-type names these tests look
+ * for ('ENSURE_HOST_PERMISSION', 'CHECK_HOST_PERMISSION') live inside strings, so
+ * stripping them would make every assertion vacuously pass.
+ *
+ * A regex cannot fully tokenize JS, so this only removes block and line
+ * comments. That is enough for the checks below, which look for a call to
+ * chrome.permissions.request() in code and the absence of an await before it.
+ */
+function stripComments(src) {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1 ');
+}
+
+const bgCode = stripComments(bgSource);
+const popupCode = stripComments(popupJs);
+
+ok('permission is requested from the popup, not the worker',
+  /chrome\.permissions\.request\s*\(/.test(popupCode) &&
+  !/chrome\.permissions\.request\s*\(/.test(bgCode),
+  'a worker has no user gesture; the popup does');
+ok('popup no longer routes permission through a message',
+  !/ENSURE_HOST_PERMISSION/.test(popupCode),
+  'the round-trip consumes the gesture');
+
+// requestHostAccess must reach chrome.permissions.request() with no await in
+// between, because an await yields the event loop and ends the user gesture.
+const popupRaw = popupJs.match(/async function requestHostAccess[\s\S]*?\n\}/);
+ok('requestHostAccess function exists', !!popupRaw);
+if (popupRaw) {
+  const body = stripComments(popupRaw[0]);
+  const m = /chrome\.permissions\.request\s*\(/.exec(body);
+  ok('requestHostAccess calls chrome.permissions.request', !!m);
+  if (m) {
+    // Slice at the start of the match, then drop the single `await` that
+    // legitimately belongs to this very call.
+    const before = body.slice(0, m.index).replace(/await\s*$/, '');
+    const awaits = [...before.matchAll(/\bawait\b/g)].length;
+    ok('requestHostAccess awaits nothing before requesting',
+      awaits === 0,
+      `found ${awaits} await(s) before request(), which burns the gesture`);
+  }
+  ok('worker-side permission handler is read-only',
+    /CHECK_HOST_PERMISSION/.test(bgCode) && !/ENSURE_HOST_PERMISSION/.test(bgCode),
+    'the worker only reports state; it must never prompt');
+}
+
+// A lost gesture should produce an actionable message, not a Chromium internal.
+ok('lost-gesture failure is explained in plain language',
+  /user gesture/i.test(popupJs) && /fresh click|reopen the panel/i.test(popupJs),
+  'the user must be told to click again, not shown a raw error');
 
 // ─── Fetch errors must not misdiagnose CORS as a dead server ────────────────
 const providersSource = readFileSync(join(ROOT, 'lib/providers.js'), 'utf8');

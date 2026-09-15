@@ -50,6 +50,10 @@ globalThis.chrome = {
   action: { onClicked: { addListener: () => {} } },
   scripting: { executeScript: () => Promise.resolve() },
   sidePanel: { open: () => Promise.resolve() },
+  permissions: {
+    contains: () => Promise.resolve(false),
+    request: () => Promise.resolve(true),
+  },
 };
 
 globalThis.Storage = {
