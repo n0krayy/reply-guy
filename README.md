@@ -206,6 +206,7 @@ reply-guy/
 │   ├── scrape.test.mjs    # DOM tweet scraping against fixtures
 │   ├── pipeline.test.mjs  # Full generate → validate → repair flow vs a mock model
 │   ├── ui.test.mjs        # Results visibility, tab-switch state, jump-bar
+│   ├── layout.test.mjs    # Panel scrolling and the single-scroller rule
 │   └── live.test.mjs      # Same, against a real model (needs a key)
 ├── icons/
 │   ├── icon16.png

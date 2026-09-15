@@ -763,8 +763,7 @@ function renderDrafts() {
  *
  * Without this the results live only in the drafts section further down the
  * panel, which is easy to miss and easy to mistake for "nothing happened".
- */
-function updateResultsJump() {
+ */function updateResultsJump() {
   if (!dom.btnResultsJump) return;
   const n = currentDrafts.length;
   if (!n) {
@@ -779,9 +778,28 @@ function updateResultsJump() {
   dom.btnResultsJump.classList.remove('hidden');
 }
 
-/** Scrolls the results into view and flashes them, so the eye can follow. */
+/**
+ * Scrolls the results into view and flashes them, so the eye can follow.
+ *
+ * Scrolling is done manually against the panel's own scroll container rather
+ * than with scrollIntoView. In a Chrome side panel scrollIntoView can lock onto
+ * the nearest scrollable ancestor and leave the section pinned at the viewport
+ * edge, with nothing below it reachable. Computing the offset and scrolling the
+ * container keeps the whole results section reachable.
+ *
+ * The target is the jump-bar rather than the section itself, so the heading and
+ * the first card land together instead of the bar sitting alone at the top.
+ */
 function revealResults() {
-  dom.sectionDrafts.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const scroller = document.scrollingElement || document.documentElement;
+  const anchor = dom.btnResultsJump && !dom.btnResultsJump.classList.contains('hidden')
+    ? dom.btnResultsJump
+    : dom.sectionDrafts;
+
+  const top = anchor.getBoundingClientRect().top
+    + scroller.scrollTop - scroller.getBoundingClientRect().top - 8;
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+
   dom.sectionDrafts.classList.remove('results-flash');
   // Force a reflow so the animation restarts on repeated clicks.
   void dom.sectionDrafts.offsetWidth;

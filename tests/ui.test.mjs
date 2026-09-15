@@ -54,8 +54,9 @@ ok('the label distinguishes clean from flagged drafts',
 ok('generating reveals the results without the user hunting for them',
   /renderDrafts\(\);[\s\S]{0,200}revealResults\(\)/.test(js),
   'the whole point: the outcome must be unmissable');
-ok('revealResults scrolls the drafts into view',
-  /function revealResults\(\)[\s\S]{0,220}scrollIntoView/.test(js));
+ok('revealResults brings the results into view without a nested scroll trap',
+  /function revealResults\(\)[\s\S]{0,700}window\.scrollTo/.test(js),
+  'layout.test.mjs pins the details of how the scroll is performed');
 ok('the reveal is announced with a flash',
   /results-flash/.test(js) && /results-flash/.test(css));
 ok('the flash respects reduced-motion preferences',
